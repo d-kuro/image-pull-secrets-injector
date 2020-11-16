@@ -20,12 +20,13 @@ import (
 	"flag"
 	"os"
 
+	"github.com/d-kuro/image-pull-secrets-injector/hook"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
-	// +kubebuilder:scaffold:imports
+	"sigs.k8s.io/controller-runtime/pkg/webhook"
 )
 
 var (
@@ -40,27 +41,51 @@ func init() {
 }
 
 func main() {
-	var metricsAddr string
-	var enableLeaderElection bool
+	var (
+		metricsAddr     string
+		domain          string
+		secretName      string
+		secretNamespace string
+		certDir         string
+	)
+
+	var opts zap.Options
+	opts.BindFlags(flag.CommandLine)
+
 	flag.StringVar(&metricsAddr, "metrics-addr", ":8080", "The address the metric endpoint binds to.")
-	flag.BoolVar(&enableLeaderElection, "enable-leader-election", false,
-		"Enable leader election for controller manager. "+
-			"Enabling this will ensure there is only one active controller manager.")
+	flag.StringVar(&domain, "domain", "docker.io",
+		"The domain name of the image registry into which image-pull-secrets should be injected.")
+	flag.StringVar(&secretName, "secret-name", "", "The Secret name to use for image-pull-secret.")
+	flag.StringVar(&secretNamespace, "secret-namespace", "default", "The namespace where image-pull-secret exists.")
+	flag.StringVar(&certDir, "cert-dir", "",
+		"cert-dir is the directory that contains the server key and certificate. "+
+			"If not set, webhook server would look up the server key and certificate in "+
+			"{TempDir}/k8s-webhook-server/serving-certs. "+
+			"The server key and certificate must be named tls.key and tls.crt, respectively.")
+
 	flag.Parse()
 
-	ctrl.SetLogger(zap.New(zap.UseDevMode(true)))
+	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:             scheme,
 		MetricsBindAddress: metricsAddr,
 		Port:               9443,
-		LeaderElection:     enableLeaderElection,
-		LeaderElectionID:   "dfab036b.d-kuro.github.io",
+		LeaderElection:     false,
+		CertDir:            certDir,
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
 		os.Exit(1)
 	}
+
+	hookServer := mgr.GetWebhookServer()
+	hookServer.Register("/pod/mutate", &webhook.Admission{Handler: &hook.PodMutator{
+		Log:             ctrl.Log.WithName("image-pull-secrets-injector"),
+		Domain:          domain,
+		SecretName:      secretName,
+		SecretNamespace: secretNamespace,
+	}})
 
 	// +kubebuilder:scaffold:builder
 

@@ -1,12 +1,12 @@
 # Adds namespace to all resources.
-namespace: image-pull-secrets-mutator-system
+namespace: image-pull-secrets-injector-system
 
 # Value of this field is prepended to the
 # names of all resources, e.g. a deployment named
 # "wordpress" becomes "alices-wordpress".
 # Note that it should also match with the prefix (text before '-') of the namespace
 # field above.
-namePrefix: image-pull-secrets-mutator-
+namePrefix: image-pull-secrets-injector-
 
 # Labels to add to all resources and selectors.
 #commonLabels:
