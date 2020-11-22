@@ -1,1 +1,1 @@
-# image-pull-secrets-mutator
+# image-pull-secrets-injector

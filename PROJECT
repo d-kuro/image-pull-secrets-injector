@@ -1,0 +1,4 @@
+domain: d-kuro.github.io
+multigroup: true
+repo: github.com/d-kuro/image-pull-secrets-injector
+version: "2"
